@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>My GitHub Pages</title>
+</head>
+<body>
+  <h1>My GitHub Pages</h1>
+  <ul id="repo-list"></ul>
+
+  <script>
+    const username = "mkpb321"; // <-- hier deinen Usernamen eintragen
+
+    fetch(`https://api.github.com/users/${username}/repos`)
+      .then(res => res.json())
+      .then(repos => {
+        const list = document.getElementById("repo-list");
+
+        // Nur Repos mit GitHub Pages (has_pages === true)
+        const pagesRepos = repos.filter(repo => repo.has_pages);
+
+        pagesRepos.forEach(repo => {
+          // Standard-URL für Project Pages
+          const pagesUrl = `https://${username}.github.io/${repo.name}/`;
+
+          const li = document.createElement("li");
+          li.innerHTML = `<a href="${pagesUrl}" target="_blank">${repo.name}</a>`;
+          list.appendChild(li);
+        });
+
+        // Optional: Hinweis, wenn keine gefunden wurden
+        if (pagesRepos.length === 0) {
+          list.innerHTML = "<li>Keine Repositories mit GitHub Pages gefunden.</li>";
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        document.getElementById("repo-list").innerHTML =
+          "<li>Fehler beim Laden der Repositories.</li>";
+      });
+  </script>
+</body>
+</html>
