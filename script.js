@@ -84,13 +84,28 @@ function createSiteItem(repo) {
   favicon.loading = "lazy";
   favicon.referrerPolicy = "no-referrer";
 
-  // Erst versuchen, Favicon der Seite zu laden
-  favicon.src = pagesUrl.replace(/\/$/, "") + "/favicon.ico";
+  const baseUrl = pagesUrl.replace(/\/$/, "");
+  const primaryFavicon = baseUrl + "/favicon.ico";
+  const secondaryFavicon = baseUrl + "/icon/favicon.ico";
 
-  // Falls nicht vorhanden oder Fehler → Default-Icon
+  let triedSecondary = false;
+
+  // Favicon-Fallback-Kette:
+  // 1) /favicon.ico
+  // 2) /icon/favicon.ico
+  // 3) Default-Icon
   favicon.onerror = () => {
-    favicon.src = DEFAULT_FAVICON;
+    if (!triedSecondary) {
+      triedSecondary = true;
+      favicon.src = secondaryFavicon;
+    } else {
+      favicon.onerror = null; // Endlosschleife verhindern
+      favicon.src = DEFAULT_FAVICON;
+    }
   };
+
+  // Start mit dem Standard-Pfad
+  favicon.src = primaryFavicon;
 
   iconWrapper.appendChild(favicon);
 
