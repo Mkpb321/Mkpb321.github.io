@@ -101,6 +101,10 @@ function createSiteItem(repo) {
   title.className = "site-title";
   title.textContent = repo.name;
 
+  const desc = document.createElement("div");
+  desc.className = "site-desc";
+  desc.textContent = repo.description || "Keine Beschreibung.";
+
   const meta = document.createElement("div");
   meta.className = "site-meta";
 
@@ -119,6 +123,7 @@ function createSiteItem(repo) {
   meta.appendChild(stars);
 
   content.appendChild(title);
+  content.appendChild(desc);
   content.appendChild(meta);
 
   link.appendChild(iconWrapper);
