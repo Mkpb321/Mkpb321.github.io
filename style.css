@@ -1,5 +1,5 @@
 :root {
-  --bg: #020617;
+  --bg: #0b1120;
   --bg-surface: #020617;
   --bg-card: #020617;
   --accent: #6366f1;
@@ -161,22 +161,27 @@ h1 {
   padding: 7px 2px;
   text-decoration: none;
   color: inherit;
+  /* Liste bleibt bewusst dunkler als der Seitenhintergrund */
+  background-color: #020617;
   transition: background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .site-link:hover {
-  background-color: #020617;
+  /* beim Hover einen Tick heller */
+  background-color: #0b1120;
   transform: translateX(1px);
 }
+
+/* Favicons: keine Box mehr */
 
 .site-icon {
   width: 20px;
   height: 20px;
-  border-radius: 4px;
   flex-shrink: 0;
   overflow: hidden;
-  background-color: #020617;
-  border: 1px solid var(--border-subtle);
+  background: none !important;
+  border: none !important;
+  border-radius: 0 !important;
   display: flex;
   align-items: center;
   justify-content: center;

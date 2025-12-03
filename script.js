@@ -32,13 +32,16 @@ async function fetchRepos() {
 
     const mainPagesRepoName = `${GITHUB_USERNAME.toLowerCase()}.github.io`;
 
-    // Nur Repos mit GitHub Pages, ohne das Haupt-Repo Mkpb321.github.io
+    // Nur Repos mit GitHub Pages, ohne das Haupt-Repo
     const pagesRepos = repos.filter(
       (repo) =>
         repo.has_pages &&
         repo.name &&
         repo.name.toLowerCase() !== mainPagesRepoName
     );
+
+    // 🔥 Alphabetisch sortieren
+    pagesRepos.sort((a, b) => a.name.localeCompare(b.name));
 
     allPagesRepos = pagesRepos;
 
@@ -64,7 +67,6 @@ function createSiteItem(repo) {
   const li = document.createElement("li");
   li.className = "site-item";
 
-  // GitHub Pages URL: bevorzugt 'homepage' (für Custom Domains)
   const pagesUrl =
     repo.homepage && repo.homepage.trim().length > 0
       ? repo.homepage
@@ -73,7 +75,6 @@ function createSiteItem(repo) {
   const link = document.createElement("a");
   link.className = "site-link";
   link.href = pagesUrl;
-  // kein target = gleicher Tab
 
   const iconWrapper = document.createElement("div");
   iconWrapper.className = "site-icon";
@@ -90,21 +91,16 @@ function createSiteItem(repo) {
 
   let triedSecondary = false;
 
-  // Favicon-Fallback-Kette:
-  // 1) /favicon.ico
-  // 2) /icon/favicon.ico
-  // 3) Default-Icon
   favicon.onerror = () => {
     if (!triedSecondary) {
       triedSecondary = true;
       favicon.src = secondaryFavicon;
     } else {
-      favicon.onerror = null; // Endlosschleife verhindern
+      favicon.onerror = null;
       favicon.src = DEFAULT_FAVICON;
     }
   };
 
-  // Start mit dem Standard-Pfad
   favicon.src = primaryFavicon;
 
   iconWrapper.appendChild(favicon);
