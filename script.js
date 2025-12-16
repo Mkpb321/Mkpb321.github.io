@@ -123,6 +123,29 @@ function createSiteItem(repo) {
   const updatedDate = new Date(repo.updated_at);
   updated.textContent = updatedDate.toLocaleDateString();
 
+  // GitHub-Projektordner-Link direkt nach dem Datum (ohne nested <a>)
+  const githubLink = document.createElement("span");
+  githubLink.className = "repo-link";
+  githubLink.textContent = "GitHub";
+  githubLink.title = "Projektordner auf GitHub öffnen";
+  githubLink.setAttribute("role", "link");
+  githubLink.tabIndex = 0;
+
+  const githubUrl = repo.html_url;
+
+  const openGithub = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    window.open(githubUrl, "_blank", "noopener");
+  };
+
+  githubLink.addEventListener("click", openGithub);
+  githubLink.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      openGithub(event);
+    }
+  });
+
   const language = document.createElement("span");
   language.textContent = repo.language || "-";
 
@@ -130,6 +153,7 @@ function createSiteItem(repo) {
   stars.textContent = `★ ${repo.stargazers_count}`;
 
   meta.appendChild(updated);
+  meta.appendChild(githubLink);
   meta.appendChild(language);
   meta.appendChild(stars);
 
