@@ -1,14 +1,83 @@
 // Fester GitHub-Benutzername
 const GITHUB_USERNAME = "Mkpb321";
 
-const apiUrl = `https://api.github.com/users/${GITHUB_USERNAME}/repos?per_page=100&type=owner&sort=updated`;
+// Hinweis: Sortierung nach "created" erfolgt clientseitig, damit wir flexibel umschalten können.
+const apiUrl = `https://api.github.com/users/${GITHUB_USERNAME}/repos?per_page=100&type=owner`;
 
 const statusEl = document.getElementById("status");
 const sitesListEl = document.getElementById("sitesList");
 const searchInput = document.getElementById("searchInput");
 const repoCountEl = document.getElementById("repoCount");
+const sortToggleEl = document.getElementById("sortToggle");
+const viewToggleEl = document.getElementById("viewToggle");
 
 let allPagesRepos = [];
+
+// LocalStorage Keys
+const STORAGE_SORT_KEY = "tb_sort_mode"; // "created" | "alpha"
+const STORAGE_VIEW_KEY = "tb_view_mode"; // "list" | "tiles"
+
+const SORT_CREATED = "created";
+const SORT_ALPHA = "alpha";
+
+const VIEW_LIST = "list";
+const VIEW_TILES = "tiles";
+
+function safeGetStorage(key) {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeSetStorage(key, value) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // ignore (private mode / disabled storage)
+  }
+}
+
+function getSortMode() {
+  const stored = safeGetStorage(STORAGE_SORT_KEY);
+  return stored === SORT_ALPHA ? SORT_ALPHA : SORT_CREATED;
+}
+
+function getViewMode() {
+  const stored = safeGetStorage(STORAGE_VIEW_KEY);
+  return stored === VIEW_TILES ? VIEW_TILES : VIEW_LIST;
+}
+
+function setSortMode(mode) {
+  safeSetStorage(STORAGE_SORT_KEY, mode);
+}
+
+function setViewMode(mode) {
+  safeSetStorage(STORAGE_VIEW_KEY, mode);
+}
+
+function updateToggleLabels() {
+  const sortMode = getSortMode();
+  if (sortToggleEl) {
+    sortToggleEl.textContent =
+      sortMode === SORT_ALPHA ? "Sort: A–Z" : "Sort: Erstellt";
+    // aria-pressed als "aktiv" für alternative Sortierung
+    sortToggleEl.setAttribute("aria-pressed", String(sortMode === SORT_ALPHA));
+  }
+
+  const viewMode = getViewMode();
+  if (viewToggleEl) {
+    viewToggleEl.textContent =
+      viewMode === VIEW_TILES ? "Ansicht: Kacheln" : "Ansicht: Liste";
+    viewToggleEl.setAttribute("aria-pressed", String(viewMode === VIEW_TILES));
+  }
+}
+
+function applyViewMode() {
+  const viewMode = getViewMode();
+  sitesListEl.classList.toggle("sites-list--tiles", viewMode === VIEW_TILES);
+}
 
 // Einfaches Default-Icon (SVG als Data-URL)
 const DEFAULT_FAVICON =
@@ -16,6 +85,53 @@ const DEFAULT_FAVICON =
   "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>" +
   "<rect width='32' height='32' rx='6' fill='%23020617'/>" +
   "<circle cx='16' cy='16' r='9' fill='%236366f1'/></svg>";
+
+// -------------------- Sortieren / Filtern --------------------
+function sortRepos(repos, sortMode) {
+  const sorted = [...repos];
+
+  if (sortMode === SORT_ALPHA) {
+    sorted.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    return sorted;
+  }
+
+  // Default: created_at (neueste zuerst)
+  sorted.sort((a, b) => {
+    const da = new Date(a.created_at).getTime();
+    const db = new Date(b.created_at).getTime();
+    return db - da;
+  });
+
+  return sorted;
+}
+
+function getFilteredRepos() {
+  const query = searchInput?.value?.toLowerCase().trim() || "";
+  if (!query) return allPagesRepos;
+
+  return allPagesRepos.filter((repo) => {
+    const name = repo.name?.toLowerCase() || "";
+    const description = repo.description?.toLowerCase() || "";
+    return name.includes(query) || description.includes(query);
+  });
+}
+
+function renderCurrent() {
+  const filtered = getFilteredRepos();
+  const sorted = sortRepos(filtered, getSortMode());
+
+  renderSites(sorted);
+
+  if (searchInput?.value?.toLowerCase().trim()) {
+    if (sorted.length === 0) {
+      statusEl.style.display = "block";
+      statusEl.className = "status status--info";
+      statusEl.textContent = "Keine Treffer.";
+    } else {
+      statusEl.style.display = "none";
+    }
+  }
+}
 
 // -------------------- Daten laden --------------------
 async function fetchRepos() {
@@ -40,9 +156,6 @@ async function fetchRepos() {
         repo.name.toLowerCase() !== mainPagesRepoName
     );
 
-    // 🔥 Alphabetisch sortieren
-    pagesRepos.sort((a, b) => a.name.localeCompare(b.name));
-
     allPagesRepos = pagesRepos;
 
     if (pagesRepos.length === 0) {
@@ -54,7 +167,7 @@ async function fetchRepos() {
     }
 
     statusEl.style.display = "none";
-    renderSites(pagesRepos);
+    renderCurrent();
   } catch (error) {
     console.error(error);
     statusEl.className = "status status--error";
@@ -183,35 +296,38 @@ function setupSearch() {
   if (!searchInput) return;
 
   searchInput.addEventListener("input", () => {
-    const query = searchInput.value.toLowerCase().trim();
-
-    if (!query) {
-      renderSites(allPagesRepos);
-      statusEl.style.display = "none";
-      return;
-    }
-
-    const filtered = allPagesRepos.filter((repo) => {
-      const name = repo.name?.toLowerCase() || "";
-      const description = repo.description?.toLowerCase() || "";
-      return name.includes(query) || description.includes(query);
-    });
-
-    renderSites(filtered);
-
-    if (filtered.length === 0) {
-      statusEl.style.display = "block";
-      statusEl.className = "status status--info";
-      statusEl.textContent = "Keine Treffer.";
-    } else {
-      statusEl.style.display = "none";
-    }
+    renderCurrent();
   });
+}
+
+function setupToggles() {
+  if (sortToggleEl) {
+    sortToggleEl.addEventListener("click", () => {
+      const next = getSortMode() === SORT_CREATED ? SORT_ALPHA : SORT_CREATED;
+      setSortMode(next);
+      updateToggleLabels();
+      renderCurrent();
+    });
+  }
+
+  if (viewToggleEl) {
+    viewToggleEl.addEventListener("click", () => {
+      const next = getViewMode() === VIEW_LIST ? VIEW_TILES : VIEW_LIST;
+      setViewMode(next);
+      updateToggleLabels();
+      applyViewMode();
+      // Kein erneutes Render nötig, CSS übernimmt die Ansicht
+    });
+  }
 }
 
 // -------------------- Init --------------------
 document.addEventListener("DOMContentLoaded", () => {
+  // Default: Liste + erstellt (falls noch nichts gespeichert ist)
+  updateToggleLabels();
+  applyViewMode();
+
   setupSearch();
+  setupToggles();
   fetchRepos();
 });
-// neuer code weil änderungen nicht angezeigt

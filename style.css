@@ -95,6 +95,12 @@ h1 {
   margin: 6px 0 8px;
 }
 
+.controls-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 #searchInput {
   width: 100%;
   padding: 7px 9px;
@@ -114,6 +120,42 @@ h1 {
 #searchInput:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent-soft);
+}
+
+.control-btn {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast),
+    color var(--transition-fast);
+  user-select: none;
+}
+
+.control-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-main);
+}
+
+.control-btn:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-soft);
+}
+
+/* Auf sehr kleinen Screens Buttons untereinander */
+@media (max-width: 520px) {
+  .controls-row {
+    flex-wrap: wrap;
+  }
+
+  #searchInput {
+    flex: 1 1 100%;
+  }
 }
 
 /* Status */
@@ -235,4 +277,51 @@ h1 {
   outline: 1px solid var(--accent);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* -------------------- Kachelansicht -------------------- */
+
+.sites-list--tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.sites-list--tiles .site-item {
+  border-top: none;
+}
+
+.sites-list--tiles .site-link {
+  height: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background-color: #020617;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  transform: none;
+}
+
+.sites-list--tiles .site-link:hover {
+  background-color: #0b1120;
+  transform: translateY(-1px);
+}
+
+.sites-list--tiles .site-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.sites-list--tiles .site-title {
+  font-size: 0.9rem;
+}
+
+.sites-list--tiles .site-desc {
+  display: none; /* kleine Kacheln: Beschreibung ausblenden */
+}
+
+.sites-list--tiles .site-meta {
+  font-size: 0.75rem;
+  gap: 6px;
 }

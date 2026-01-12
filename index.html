@@ -20,12 +20,22 @@
 
     <main>
       <section class="controls">
-        <input
-          id="searchInput"
-          type="search"
-          placeholder="Suche…"
-          aria-label="Nach Repository filtern"
-        />
+        <div class="controls-row">
+          <input
+            id="searchInput"
+            type="search"
+            placeholder="Suche…"
+            aria-label="Nach Repository filtern"
+          />
+
+          <button id="sortToggle" class="control-btn" type="button" aria-pressed="false">
+            Sort: Erstellt
+          </button>
+
+          <button id="viewToggle" class="control-btn" type="button" aria-pressed="false">
+            Ansicht: Liste
+          </button>
+        </div>
       </section>
 
       <section id="status" class="status status--info">
