@@ -203,13 +203,11 @@ h1 {
   padding: 7px 2px;
   text-decoration: none;
   color: inherit;
-  /* Liste bleibt bewusst dunkler als der Seitenhintergrund */
   background-color: #020617;
   transition: background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .site-link:hover {
-  /* beim Hover einen Tick heller */
   background-color: #0b1120;
   transform: translateX(1px);
 }
@@ -299,7 +297,7 @@ h1 {
   background-color: #020617;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  gap: 10px;
   transform: none;
 }
 
@@ -308,9 +306,10 @@ h1 {
   transform: translateY(-1px);
 }
 
+/* In Kacheln Icon bewusst größer */
 .sites-list--tiles .site-icon {
-  width: 18px;
-  height: 18px;
+  width: 30px;
+  height: 30px;
 }
 
 .sites-list--tiles .site-title {

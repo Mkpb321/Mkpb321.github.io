@@ -1,7 +1,7 @@
 // Fester GitHub-Benutzername
 const GITHUB_USERNAME = "Mkpb321";
 
-// Hinweis: Sortierung nach "created" erfolgt clientseitig, damit wir flexibel umschalten können.
+// Hinweis: Sortierung erfolgt clientseitig, damit wir flexibel umschalten können.
 const apiUrl = `https://api.github.com/users/${GITHUB_USERNAME}/repos?per_page=100&type=owner`;
 
 const statusEl = document.getElementById("status");
@@ -14,10 +14,11 @@ const viewToggleEl = document.getElementById("viewToggle");
 let allPagesRepos = [];
 
 // LocalStorage Keys
-const STORAGE_SORT_KEY = "tb_sort_mode"; // "created" | "alpha"
+const STORAGE_SORT_KEY = "tb_sort_mode"; // "created" | "updated" | "alpha"
 const STORAGE_VIEW_KEY = "tb_view_mode"; // "list" | "tiles"
 
 const SORT_CREATED = "created";
+const SORT_UPDATED = "updated";
 const SORT_ALPHA = "alpha";
 
 const VIEW_LIST = "list";
@@ -41,7 +42,9 @@ function safeSetStorage(key, value) {
 
 function getSortMode() {
   const stored = safeGetStorage(STORAGE_SORT_KEY);
-  return stored === SORT_ALPHA ? SORT_ALPHA : SORT_CREATED;
+  if (stored === SORT_ALPHA) return SORT_ALPHA;
+  if (stored === SORT_UPDATED) return SORT_UPDATED;
+  return SORT_CREATED; // default
 }
 
 function getViewMode() {
@@ -60,10 +63,12 @@ function setViewMode(mode) {
 function updateToggleLabels() {
   const sortMode = getSortMode();
   if (sortToggleEl) {
-    sortToggleEl.textContent =
-      sortMode === SORT_ALPHA ? "Sort: A–Z" : "Sort: Erstellt";
-    // aria-pressed als "aktiv" für alternative Sortierung
-    sortToggleEl.setAttribute("aria-pressed", String(sortMode === SORT_ALPHA));
+    if (sortMode === SORT_ALPHA) sortToggleEl.textContent = "Sort: A–Z";
+    else if (sortMode === SORT_UPDATED) sortToggleEl.textContent = "Sort: Aktualisiert";
+    else sortToggleEl.textContent = "Sort: Erstellt";
+
+    // aria-pressed als "nicht-default" (alles außer 'created')
+    sortToggleEl.setAttribute("aria-pressed", String(sortMode !== SORT_CREATED));
   }
 
   const viewMode = getViewMode();
@@ -92,6 +97,16 @@ function sortRepos(repos, sortMode) {
 
   if (sortMode === SORT_ALPHA) {
     sorted.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    return sorted;
+  }
+
+  if (sortMode === SORT_UPDATED) {
+    // updated_at (neueste zuerst)
+    sorted.sort((a, b) => {
+      const da = new Date(a.updated_at).getTime();
+      const db = new Date(b.updated_at).getTime();
+      return db - da;
+    });
     return sorted;
   }
 
@@ -303,7 +318,13 @@ function setupSearch() {
 function setupToggles() {
   if (sortToggleEl) {
     sortToggleEl.addEventListener("click", () => {
-      const next = getSortMode() === SORT_CREATED ? SORT_ALPHA : SORT_CREATED;
+      // Zyklus: created -> updated -> alpha -> created
+      const current = getSortMode();
+      let next = SORT_CREATED;
+      if (current === SORT_CREATED) next = SORT_UPDATED;
+      else if (current === SORT_UPDATED) next = SORT_ALPHA;
+      else next = SORT_CREATED;
+
       setSortMode(next);
       updateToggleLabels();
       renderCurrent();
