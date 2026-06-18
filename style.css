@@ -324,3 +324,18 @@ h1 {
   font-size: 0.75rem;
   gap: 6px;
 }
+
+/* Externe, nicht über GitHub Pages gefundene Tools */
+.source-badge {
+  color: var(--text-main);
+}
+
+.site-item--external .site-link {
+  border-left: 2px solid var(--accent);
+  padding-left: 8px;
+}
+
+.sites-list--tiles .site-item--external .site-link {
+  border-left-width: 1px;
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+}

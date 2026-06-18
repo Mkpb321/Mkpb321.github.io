@@ -11,7 +11,7 @@ const repoCountEl = document.getElementById("repoCount");
 const sortToggleEl = document.getElementById("sortToggle");
 const viewToggleEl = document.getElementById("viewToggle");
 
-let allPagesRepos = [];
+let allTools = [];
 
 // LocalStorage Keys
 const STORAGE_SORT_KEY = "tb_sort_mode"; // "created" | "updated" | "alpha"
@@ -23,6 +23,9 @@ const SORT_ALPHA = "alpha";
 
 const VIEW_LIST = "list";
 const VIEW_TILES = "tiles";
+
+const TOOL_TYPE_GITHUB = "github";
+const TOOL_TYPE_EXTERNAL = "external";
 
 function safeGetStorage(key) {
   try {
@@ -91,9 +94,92 @@ const DEFAULT_FAVICON =
   "<rect width='32' height='32' rx='6' fill='%23020617'/>" +
   "<circle cx='16' cy='16' r='9' fill='%236366f1'/></svg>";
 
+function toTimestamp(value) {
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function trimTrailingSlash(value) {
+  return String(value || "").replace(/\/$/, "");
+}
+
+function normalizeGithubRepo(repo) {
+  const pagesUrl =
+    repo.homepage && repo.homepage.trim().length > 0
+      ? repo.homepage
+      : `https://${GITHUB_USERNAME}.github.io/${repo.name}/`;
+
+  return {
+    id: `github-${repo.id || repo.name}`,
+    type: TOOL_TYPE_GITHUB,
+    name: repo.name,
+    description: repo.description || "Keine Beschreibung.",
+    url: pagesUrl,
+    createdAt: repo.created_at,
+    updatedAt: repo.updated_at,
+    sourceLabel: "GitHub Pages",
+    repoUrl: repo.html_url,
+    language: repo.language || "-",
+    stars: Number.isFinite(repo.stargazers_count) ? repo.stargazers_count : 0,
+    iconCandidates: [
+      `${trimTrailingSlash(pagesUrl)}/favicon.ico`,
+      `${trimTrailingSlash(pagesUrl)}/icon/favicon.ico`
+    ].filter(Boolean),
+    searchableText: [repo.name, repo.description, "GitHub Pages", repo.language]
+      .filter(Boolean)
+      .join(" ")
+  };
+}
+
+function normalizeExternalTool(tool, index) {
+  const url = tool.url || "";
+  const iconCandidates = [
+    tool.iconUrl,
+    `${trimTrailingSlash(url)}/favicon.ico`,
+    `${trimTrailingSlash(url)}/icon/favicon.ico`
+  ].filter(Boolean);
+
+  const name = tool.name || `Externes Tool ${index + 1}`;
+  const description = tool.description || "Extern gehostetes Tool.";
+  const sourceLabel = tool.hostLabel || "Extern";
+
+  return {
+    id: `external-${tool.id || index}`,
+    type: TOOL_TYPE_EXTERNAL,
+    name,
+    description,
+    url,
+    createdAt: tool.createdAt || tool.created_at || tool.updatedAt || tool.updated_at || "",
+    updatedAt: tool.updatedAt || tool.updated_at || tool.createdAt || tool.created_at || "",
+    sourceLabel,
+    repoUrl: "",
+    language: sourceLabel,
+    stars: null,
+    iconCandidates,
+    searchableText: [
+      name,
+      description,
+      sourceLabel,
+      ...(Array.isArray(tool.searchTerms) ? tool.searchTerms : [])
+    ]
+      .filter(Boolean)
+      .join(" ")
+  };
+}
+
+function getExternalTools() {
+  const configuredTools = Array.isArray(window.TOOLBOX_EXTERNAL_TOOLS)
+    ? window.TOOLBOX_EXTERNAL_TOOLS
+    : [];
+
+  return configuredTools
+    .filter((tool) => tool && tool.url)
+    .map((tool, index) => normalizeExternalTool(tool, index));
+}
+
 // -------------------- Sortieren / Filtern --------------------
-function sortRepos(repos, sortMode) {
-  const sorted = [...repos];
+function sortTools(tools, sortMode) {
+  const sorted = [...tools];
 
   if (sortMode === SORT_ALPHA) {
     sorted.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -101,39 +187,30 @@ function sortRepos(repos, sortMode) {
   }
 
   if (sortMode === SORT_UPDATED) {
-    // updated_at (neueste zuerst)
-    sorted.sort((a, b) => {
-      const da = new Date(a.updated_at).getTime();
-      const db = new Date(b.updated_at).getTime();
-      return db - da;
-    });
+    // updatedAt (neueste zuerst)
+    sorted.sort((a, b) => toTimestamp(b.updatedAt) - toTimestamp(a.updatedAt));
     return sorted;
   }
 
-  // Default: created_at (neueste zuerst)
-  sorted.sort((a, b) => {
-    const da = new Date(a.created_at).getTime();
-    const db = new Date(b.created_at).getTime();
-    return db - da;
-  });
+  // Default: createdAt (neueste zuerst)
+  sorted.sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt));
 
   return sorted;
 }
 
-function getFilteredRepos() {
+function getFilteredTools() {
   const query = searchInput?.value?.toLowerCase().trim() || "";
-  if (!query) return allPagesRepos;
+  if (!query) return allTools;
 
-  return allPagesRepos.filter((repo) => {
-    const name = repo.name?.toLowerCase() || "";
-    const description = repo.description?.toLowerCase() || "";
-    return name.includes(query) || description.includes(query);
+  return allTools.filter((tool) => {
+    const searchableText = tool.searchableText?.toLowerCase() || "";
+    return searchableText.includes(query);
   });
 }
 
 function renderCurrent() {
-  const filtered = getFilteredRepos();
-  const sorted = sortRepos(filtered, getSortMode());
+  const filtered = getFilteredTools();
+  const sorted = sortTools(filtered, getSortMode());
 
   renderSites(sorted);
 
@@ -150,7 +227,11 @@ function renderCurrent() {
 
 // -------------------- Daten laden --------------------
 async function fetchRepos() {
+  const externalTools = getExternalTools();
+
   try {
+    statusEl.style.display = "block";
+    statusEl.className = "status status--info";
     statusEl.textContent = "Lädt…";
 
     const response = await fetch(apiUrl);
@@ -171,12 +252,13 @@ async function fetchRepos() {
         repo.name.toLowerCase() !== mainPagesRepoName
     );
 
-    allPagesRepos = pagesRepos;
+    const githubTools = pagesRepos.map(normalizeGithubRepo);
+    allTools = [...githubTools, ...externalTools];
 
-    if (pagesRepos.length === 0) {
+    if (allTools.length === 0) {
       statusEl.className = "status status--info";
-      statusEl.textContent = "Keine Seiten gefunden.";
-      repoCountEl.textContent = "0";
+      statusEl.textContent = "Keine Tools gefunden.";
+      repoCountEl.textContent = "0 Tools";
       sitesListEl.innerHTML = "";
       return;
     }
@@ -185,24 +267,72 @@ async function fetchRepos() {
     renderCurrent();
   } catch (error) {
     console.error(error);
+
+    allTools = externalTools;
+
+    if (allTools.length > 0) {
+      renderCurrent();
+      statusEl.style.display = "block";
+      statusEl.className = "status status--info";
+      statusEl.textContent = "GitHub konnte nicht geladen werden. Externe Tools werden angezeigt.";
+      return;
+    }
+
     statusEl.className = "status status--error";
     statusEl.textContent = "Fehler beim Laden.";
+    repoCountEl.textContent = "0 Tools";
+    sitesListEl.innerHTML = "";
   }
 }
 
 // -------------------- Listeneintrag erstellen --------------------
-function createSiteItem(repo) {
-  const li = document.createElement("li");
-  li.className = "site-item";
+function applyFaviconFallback(favicon, iconCandidates) {
+  const candidates = [...iconCandidates, DEFAULT_FAVICON];
+  let currentIndex = 0;
 
-  const pagesUrl =
-    repo.homepage && repo.homepage.trim().length > 0
-      ? repo.homepage
-      : `https://${GITHUB_USERNAME}.github.io/${repo.name}/`;
+  favicon.onerror = () => {
+    currentIndex += 1;
+    favicon.src = candidates[currentIndex] || DEFAULT_FAVICON;
+
+    if (favicon.src === DEFAULT_FAVICON) {
+      favicon.onerror = null;
+    }
+  };
+
+  favicon.src = candidates[currentIndex] || DEFAULT_FAVICON;
+}
+
+function createMetaLink(label, title, url) {
+  const metaLink = document.createElement("span");
+  metaLink.className = "repo-link";
+  metaLink.textContent = label;
+  metaLink.title = title;
+  metaLink.setAttribute("role", "link");
+  metaLink.tabIndex = 0;
+
+  const openLink = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    window.open(url, "_blank", "noopener");
+  };
+
+  metaLink.addEventListener("click", openLink);
+  metaLink.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      openLink(event);
+    }
+  });
+
+  return metaLink;
+}
+
+function createSiteItem(tool) {
+  const li = document.createElement("li");
+  li.className = `site-item site-item--${tool.type}`;
 
   const link = document.createElement("a");
   link.className = "site-link";
-  link.href = pagesUrl;
+  link.href = tool.url;
 
   const iconWrapper = document.createElement("div");
   iconWrapper.className = "site-icon";
@@ -213,23 +343,7 @@ function createSiteItem(repo) {
   favicon.loading = "lazy";
   favicon.referrerPolicy = "no-referrer";
 
-  const baseUrl = pagesUrl.replace(/\/$/, "");
-  const primaryFavicon = baseUrl + "/favicon.ico";
-  const secondaryFavicon = baseUrl + "/icon/favicon.ico";
-
-  let triedSecondary = false;
-
-  favicon.onerror = () => {
-    if (!triedSecondary) {
-      triedSecondary = true;
-      favicon.src = secondaryFavicon;
-    } else {
-      favicon.onerror = null;
-      favicon.src = DEFAULT_FAVICON;
-    }
-  };
-
-  favicon.src = primaryFavicon;
+  applyFaviconFallback(favicon, tool.iconCandidates || []);
 
   iconWrapper.appendChild(favicon);
 
@@ -238,52 +352,43 @@ function createSiteItem(repo) {
 
   const title = document.createElement("div");
   title.className = "site-title";
-  title.textContent = repo.name;
+  title.textContent = tool.name;
 
   const desc = document.createElement("div");
   desc.className = "site-desc";
-  desc.textContent = repo.description || "Keine Beschreibung.";
+  desc.textContent = tool.description;
 
   const meta = document.createElement("div");
   meta.className = "site-meta";
 
   const updated = document.createElement("span");
-  const updatedDate = new Date(repo.updated_at);
-  updated.textContent = updatedDate.toLocaleDateString();
+  const updatedTimestamp = toTimestamp(tool.updatedAt);
+  updated.textContent = updatedTimestamp
+    ? new Date(updatedTimestamp).toLocaleDateString()
+    : "Ohne Datum";
 
-  // GitHub-Projektordner-Link direkt nach dem Datum (ohne nested <a>)
-  const githubLink = document.createElement("span");
-  githubLink.className = "repo-link";
-  githubLink.textContent = "GitHub";
-  githubLink.title = "Projektordner auf GitHub öffnen";
-  githubLink.setAttribute("role", "link");
-  githubLink.tabIndex = 0;
-
-  const githubUrl = repo.html_url;
-
-  const openGithub = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    window.open(githubUrl, "_blank", "noopener");
-  };
-
-  githubLink.addEventListener("click", openGithub);
-  githubLink.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      openGithub(event);
-    }
-  });
-
-  const language = document.createElement("span");
-  language.textContent = repo.language || "-";
-
-  const stars = document.createElement("span");
-  stars.textContent = `★ ${repo.stargazers_count}`;
+  const source = document.createElement("span");
+  source.className = "source-badge";
+  source.textContent = tool.sourceLabel;
 
   meta.appendChild(updated);
-  meta.appendChild(githubLink);
+  meta.appendChild(source);
+
+  if (tool.type === TOOL_TYPE_GITHUB && tool.repoUrl) {
+    meta.appendChild(
+      createMetaLink("GitHub", "Projektordner auf GitHub öffnen", tool.repoUrl)
+    );
+  }
+
+  const language = document.createElement("span");
+  language.textContent = tool.language || "-";
   meta.appendChild(language);
-  meta.appendChild(stars);
+
+  if (tool.type === TOOL_TYPE_GITHUB) {
+    const stars = document.createElement("span");
+    stars.textContent = `★ ${tool.stars}`;
+    meta.appendChild(stars);
+  }
 
   content.appendChild(title);
   content.appendChild(desc);
@@ -296,14 +401,14 @@ function createSiteItem(repo) {
   return li;
 }
 
-function renderSites(repos) {
+function renderSites(tools) {
   sitesListEl.innerHTML = "";
-  repos.forEach((repo) => {
-    const item = createSiteItem(repo);
+  tools.forEach((tool) => {
+    const item = createSiteItem(tool);
     sitesListEl.appendChild(item);
   });
 
-  repoCountEl.textContent = String(repos.length);
+  repoCountEl.textContent = `${tools.length} Tools`;
 }
 
 // -------------------- Suche / Filter --------------------
